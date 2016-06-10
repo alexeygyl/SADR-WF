@@ -1,14 +1,11 @@
-package com.example.smit.sadr.Adapters;
+package com.example.smit.sadr;
 
 
 import android.media.MediaPlayer;
-import android.os.Build;
-import android.util.Log;
 
-import java.io.File;
+import com.example.smit.sadr.General;
+
 import java.io.IOException;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 public class MusicUnits {
      public String Mname;
@@ -34,7 +31,7 @@ public class MusicUnits {
         this.Mname = Name.substring(0,Name.lastIndexOf("."));
         this.MAuthor = "Unknown";
     }
-    
+
 
         this.Mtime = General.getStrTime(mp.getDuration());
         this.Path = Path;

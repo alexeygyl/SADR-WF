@@ -1,7 +1,5 @@
-package com.example.smit.sadr.Adapters;
+package com.example.smit.sadr;
 
-
-import android.util.Log;
 
 import java.io.File;
 import java.util.ArrayList;
