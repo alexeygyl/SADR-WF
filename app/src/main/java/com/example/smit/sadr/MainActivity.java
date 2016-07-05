@@ -1,14 +1,25 @@
 package com.example.smit.sadr;
 
+import android.content.Context;
+import android.content.Intent;
+import android.content.res.Resources;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
+import android.media.AudioFormat;
+import android.media.AudioTrack;
+import android.media.MediaMetadata;
+import android.media.MediaMetadataRetriever;
 import android.media.MediaPlayer;
+import android.net.rtp.AudioStream;
+import android.net.wifi.WifiManager;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.SystemClock;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.Menu;
+import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.view.View;
 import android.widget.AdapterView;
@@ -16,12 +27,19 @@ import android.widget.ImageButton;
 import android.widget.ListView;
 import android.widget.SeekBar;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.example.smit.sadr.Adapters.ListMusicAdapter;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
+
+import static android.widget.Toast.LENGTH_LONG;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -75,13 +93,27 @@ public class MainActivity extends AppCompatActivity {
 
         listmusic.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
-            public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+            public void onItemClick(AdapterView<?> parent, View view, final int position, long id) {
                 musicName.setText(musicUnits.get(position).Mname);
                 musicAuthor.setText(musicUnits.get(position).MAuthor);
-                startPlay(position, status);
+                getMetaMp3Info(position);
+                //startPlay(position, status);
                 Mplay.setBackgroundResource(R.drawable.ic_pause_black_36dp);
                 status = ON;
                 lastMusPos = position;
+                for(int i=0; i<General.LUnits.size();i++){
+                    if(General.LUnits.get(i).status==General.SYNC&&General.LUnits.get(i).turn==General.TURN_ON){
+                        final int finalI = i;
+                        Thread thrd = new Thread(new Runnable() {
+                            @Override
+                            public void run() {
+                                General.sendData(finalI,musicUnits.get(position).Path,musicUnits.get(position).Mname);
+                            }
+                        });
+                        thrd.start();
+                    }
+
+                }
             }
         });
         Mplay.setOnTouchListener(new View.OnTouchListener() {
@@ -167,6 +199,19 @@ public class MainActivity extends AppCompatActivity {
         getMenuInflater().inflate(R.menu.menu, menu);
         return true;
     }
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        switch(item.getItemId()) {
+            case R.id.Loudspeakers:
+                Intent intent = new Intent(this,Loudspeakers.class);
+                startActivity(intent);
+
+
+                return true;
+        }
+        return(super.onOptionsItemSelected(item));
+    }
+
 
     public void startPlay( int position, final Integer status){
         if(status==ON || status ==PAUSE){
@@ -186,6 +231,29 @@ public class MainActivity extends AppCompatActivity {
         }
 
     }
+
+    public void getMetaMp3Info( int position){
+        
+        File file = new File(musicUnits.get(position).Path);
+        byte[] buff = new byte[128];
+        Log.e("ERR",Long.toString(file.length()));
+        try {
+            InputStream is = new FileInputStream(file);
+
+            is.skip(file.length() - 128);
+            int count = is.read(buff, 0, 128);
+            String meta = new String(buff, 0, 128);
+            Log.e("ERR", meta);
+
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        //Log.e("META",musicUnits.get(position).Mname);
+
+    }
+
     public void startPlayProgressUpdater() {
         seekBar.setProgress(mediaPlayer.getCurrentPosition());
         mDuration.setText(General.getStrTime(mediaPlayer.getCurrentPosition()));

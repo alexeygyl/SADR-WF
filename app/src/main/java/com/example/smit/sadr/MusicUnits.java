@@ -25,10 +25,10 @@ public class MusicUnits {
         }
     if((pos=Name.indexOf("-"))>0){
         this.MAuthor = Name.substring(0,pos);
-        this.Mname = Name.substring(pos+1,Name.lastIndexOf("."));
+        this.Mname = Name.substring(pos+1,Name.length());
     }
     else{
-        this.Mname = Name.substring(0,Name.lastIndexOf("."));
+        this.Mname = Name;
         this.MAuthor = "Unknown";
     }
 

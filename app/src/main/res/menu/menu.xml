@@ -3,6 +3,6 @@
     xmlns:tools="http://schemas.android.com/tools" tools:context=".MainActivity">
 
     <item
-        android:id="@+id/menu" android:icon="@drawable/menu" app:showAsAction="always"   android:title="menu" />
+        android:id="@+id/Loudspeakers" android:icon="@drawable/ic_playlist_play_white_36dp" app:showAsAction="always"   android:title="Loudspeakers" />
 
 </menu>

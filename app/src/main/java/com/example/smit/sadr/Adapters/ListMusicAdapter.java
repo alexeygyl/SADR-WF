@@ -35,7 +35,7 @@ public class ListMusicAdapter extends ArrayAdapter<MusicUnits>  {
         TextView textTime = (TextView) rowView.findViewById(R.id.MusicTime);
         ImageView imageView = (ImageView) rowView.findViewById(R.id.logo);
 
-        textName.setText(musicUnitses.get(position).Mname);
+        textName.setText(musicUnitses.get(position).Mname.substring(0,musicUnitses.get(position).Mname.lastIndexOf(".")));
         textName.setTextColor(Color.BLACK);
         textName.setMaxWidth(320);
         textAuthor.setText(musicUnitses.get(position).MAuthor);
