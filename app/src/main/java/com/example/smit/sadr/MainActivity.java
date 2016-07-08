@@ -34,6 +34,7 @@ import com.example.smit.sadr.Adapters.ListMusicAdapter;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -96,21 +97,45 @@ public class MainActivity extends AppCompatActivity {
             public void onItemClick(AdapterView<?> parent, View view, final int position, long id) {
                 musicName.setText(musicUnits.get(position).Mname);
                 musicAuthor.setText(musicUnits.get(position).MAuthor);
-                getMetaMp3Info(position);
+                //getMetaMp3Info(position);
+
                 //startPlay(position, status);
+                if(status==ON){
+                    status=STOP;
+                    for(int i=0; i<General.LUnits.size();i++){
+                        if(General.LUnits.get(i).status==General.SYNC&&General.LUnits.get(i).turn==General.TURN_ON){
+
+                            final int finalI = i;
+                            Thread thrd_stop_play = new Thread(new Runnable() {
+                                @Override
+                                public void run() {
+                                    General.sendStopPlay(General.LUnits.get(finalI).ip,General.LUnits.get(finalI).port);
+                                }
+                            });
+                            thrd_stop_play.start();
+                        }
+                    }
+                }
+                while(General.COLUN_STATUS==General.PLAYING){}
                 Mplay.setBackgroundResource(R.drawable.ic_pause_black_36dp);
                 status = ON;
                 lastMusPos = position;
+                General.COLUN_STATUS = General.PLAYING;
                 for(int i=0; i<General.LUnits.size();i++){
                     if(General.LUnits.get(i).status==General.SYNC&&General.LUnits.get(i).turn==General.TURN_ON){
                         final int finalI = i;
-                        Thread thrd = new Thread(new Runnable() {
+                        Thread thrd_start_play = new Thread(new Runnable() {
                             @Override
                             public void run() {
-                                General.sendData(finalI,musicUnits.get(position).Path,musicUnits.get(position).Mname);
+                                General.sendData(finalI,
+                                                    musicUnits.get(position).Path,
+                                                    musicUnits.get(position).Mname,
+                                                    musicUnits.get(position).MDuration,
+                                                    musicUnits.get(position).formatIndex);
                             }
                         });
-                        thrd.start();
+                        thrd_start_play.start();
+
                     }
 
                 }
@@ -125,25 +150,39 @@ public class MainActivity extends AppCompatActivity {
                         return true;
                     case MotionEvent.ACTION_UP:
                         v.setBackgroundColor(Color.WHITE);
-                        if (status == PAUSE) {
+                       /* if (status == PAUSE) {
                             v.setBackgroundResource(R.drawable.ic_pause_black_36dp);
                             mediaPlayer.start();
 
                             startPlayProgressUpdater();
-                            status = ON;
-                        } else if (status == ON) {
+                            status = ON;*/
+                         if (status == ON) {
                             v.setBackgroundResource(R.drawable.ic_play_arrow_black_36dp);
-                            mediaPlayer.pause();
+                            //mediaPlayer.pause();
+                             mediaPlayer.stop();
+                             mediaPlayer.reset();
+                             status = STOP;
                             lastTime = SystemClock.elapsedRealtime();
+                             for(int i=0; i<General.LUnits.size();i++){
+                                 if(General.LUnits.get(i).status==General.SYNC&&General.LUnits.get(i).turn==General.TURN_ON){
+                                     final int finalI = i;
+                                     Thread thrd = new Thread(new Runnable() {
+                                         @Override
+                                         public void run() {
+                                             General.sendStopPlay(General.LUnits.get(finalI).ip,General.LUnits.get(finalI).port);
+                                         }
+                                     });
+                                     thrd.start();
+                                 }
+                             }
 
-
-                            status = PAUSE;
-                        } else if (status == STOP) {
+                        }
+                        /*else if (status == STOP) {
                             v.setBackgroundResource(R.drawable.ic_pause_black_36dp);
                             initText();
                             startPlay(0, status);
                             status = ON;
-                        }
+                        }*/
                         return true;
                 }
                 return false;
@@ -153,7 +192,7 @@ public class MainActivity extends AppCompatActivity {
         MplayNext.setOnTouchListener(new View.OnTouchListener() {
             @Override
             public boolean onTouch(View v, MotionEvent event) {
-                switch (event.getAction()) {
+               /* switch (event.getAction()) {
                     case MotionEvent.ACTION_DOWN:
                         v.setBackgroundColor(Color.rgb(230, 230, 230));
                         return true;
@@ -161,20 +200,20 @@ public class MainActivity extends AppCompatActivity {
 
                         v.setBackgroundColor(Color.WHITE);
                         lastMusPos++;
-                        if(lastMusPos>=musicUnits.size())lastMusPos=0;
+                        if (lastMusPos >= musicUnits.size()) lastMusPos = 0;
                         musicName.setText(musicUnits.get(lastMusPos).Mname);
                         musicAuthor.setText(musicUnits.get(lastMusPos).MAuthor);
                         startPlay(lastMusPos, status);
 
                         return true;
-                        }
+                }*/
                 return false;
-                }
+            }
         });
         MplayPrev.setOnTouchListener(new View.OnTouchListener() {
             @Override
             public boolean onTouch(View v, MotionEvent event) {
-                switch (event.getAction()) {
+             /*   switch (event.getAction()) {
                     case MotionEvent.ACTION_DOWN:
                         v.setBackgroundColor(Color.rgb(230, 230, 230));
                         return true;
@@ -186,7 +225,7 @@ public class MainActivity extends AppCompatActivity {
                         musicAuthor.setText(musicUnits.get(lastMusPos).MAuthor);
                         startPlay(lastMusPos, status);
                         return true;
-                }
+                }*/
                 return false;
             }
         });

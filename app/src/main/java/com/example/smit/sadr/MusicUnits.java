@@ -12,8 +12,10 @@ public class MusicUnits {
      public String MAuthor;
      public String Mtime;
      public String Path;
+     public Integer MDuration;
+     public Integer formatIndex;
 
-    public MusicUnits(String Name, String Author,String Path){
+    public MusicUnits(String Name, String Author,String Path,Integer formatIndex){
         String tmp;
         Integer pos;
         MediaPlayer mp = new MediaPlayer();
@@ -34,7 +36,9 @@ public class MusicUnits {
 
 
         this.Mtime = General.getStrTime(mp.getDuration());
+        this.MDuration = mp.getDuration();
         this.Path = Path;
+        this.formatIndex=formatIndex;
         mp.release();
     }
 
