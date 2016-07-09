@@ -39,6 +39,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Timer;
+import java.util.TimerTask;
 
 import static android.widget.Toast.LENGTH_LONG;
 
@@ -53,6 +55,7 @@ public class MainActivity extends AppCompatActivity {
     static Integer PAUSE = 2;
     static  Integer STOP =0;
     static Integer status=STOP;
+    static Integer sendStatus = STOP;
     Integer lastMusPos = 0;
     Long lastTime;
     MediaPlayer mediaPlayer;
@@ -62,6 +65,7 @@ public class MainActivity extends AppCompatActivity {
     TextView musicAuthor;
     ListView listmusic;
     TextView mDuration;
+    static Integer MODE=1;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -98,47 +102,38 @@ public class MainActivity extends AppCompatActivity {
                 musicName.setText(musicUnits.get(position).Mname);
                 musicAuthor.setText(musicUnits.get(position).MAuthor);
                 //getMetaMp3Info(position);
-
-                //startPlay(position, status);
-                if(status==ON){
-                    status=STOP;
-                    for(int i=0; i<General.LUnits.size();i++){
-                        if(General.LUnits.get(i).status==General.SYNC&&General.LUnits.get(i).turn==General.TURN_ON){
-
-                            final int finalI = i;
-                            Thread thrd_stop_play = new Thread(new Runnable() {
-                                @Override
-                                public void run() {
-                                    General.sendStopPlay(General.LUnits.get(finalI).ip,General.LUnits.get(finalI).port);
-                                }
-                            });
-                            thrd_stop_play.start();
-                        }
-                    }
-                }
-                while(General.COLUN_STATUS==General.PLAYING){}
-                Mplay.setBackgroundResource(R.drawable.ic_pause_black_36dp);
-                status = ON;
-                lastMusPos = position;
-                General.COLUN_STATUS = General.PLAYING;
-                for(int i=0; i<General.LUnits.size();i++){
-                    if(General.LUnits.get(i).status==General.SYNC&&General.LUnits.get(i).turn==General.TURN_ON){
-                        final int finalI = i;
-                        Thread thrd_start_play = new Thread(new Runnable() {
-                            @Override
-                            public void run() {
-                                General.sendData(finalI,
-                                                    musicUnits.get(position).Path,
-                                                    musicUnits.get(position).Mname,
-                                                    musicUnits.get(position).MDuration,
-                                                    musicUnits.get(position).formatIndex);
+                switch (MODE){
+                    case 1:
+                        if(status==STOP){
+                            status = ON;
+                            if(sendStatus==STOP){
+                                General.COLUN_STATUS = General.PLAYING;
+                                sendStatus=ON;
+                                General.setLSNotReadyToPlay();
+                                startRemotePlay(position);
+                                General.playWhenIsReady();
                             }
-                        });
-                        thrd_start_play.start();
-
-                    }
-
+                        }else{
+                            //Log.e("Status","PAUSE, Play new comp");
+                            stopRemotePlay();
+                            while(General.COUNT_TO_CHECK!=0){};
+                            General.setLSNotReadyToPlay();
+                            status = ON;
+                            if(sendStatus==STOP){
+                                General.COLUN_STATUS = General.PLAYING;
+                                sendStatus=ON;
+                                startRemotePlay(position);
+                                General.playWhenIsReady();
+                            }
+                        }
+                    break;
+                    case 2:
+                        status = ON;
+                        startPlay(lastMusPos, status);
+                    break;
                 }
+                Mplay.setBackgroundResource(R.drawable.ic_pause_black_36dp);
+                lastMusPos = position;
             }
         });
         Mplay.setOnTouchListener(new View.OnTouchListener() {
@@ -150,39 +145,49 @@ public class MainActivity extends AppCompatActivity {
                         return true;
                     case MotionEvent.ACTION_UP:
                         v.setBackgroundColor(Color.WHITE);
-                       /* if (status == PAUSE) {
+                        if (status == PAUSE) {
                             v.setBackgroundResource(R.drawable.ic_pause_black_36dp);
-                            mediaPlayer.start();
-
-                            startPlayProgressUpdater();
-                            status = ON;*/
-                         if (status == ON) {
+                            switch (MODE) {
+                                case 1:
+                                    stopRemotePause();
+                                    status=ON;
+                                break;
+                                case 2:
+                                    mediaPlayer.start();
+                                    startPlayProgressUpdater();
+                                    status = ON;
+                                break;
+                            }
+                        }else if (status == ON) {
                             v.setBackgroundResource(R.drawable.ic_play_arrow_black_36dp);
-                            //mediaPlayer.pause();
-                             mediaPlayer.stop();
-                             mediaPlayer.reset();
-                             status = STOP;
-                            lastTime = SystemClock.elapsedRealtime();
-                             for(int i=0; i<General.LUnits.size();i++){
-                                 if(General.LUnits.get(i).status==General.SYNC&&General.LUnits.get(i).turn==General.TURN_ON){
-                                     final int finalI = i;
-                                     Thread thrd = new Thread(new Runnable() {
-                                         @Override
-                                         public void run() {
-                                             General.sendStopPlay(General.LUnits.get(finalI).ip,General.LUnits.get(finalI).port);
-                                         }
-                                     });
-                                     thrd.start();
-                                 }
+                             switch (MODE){
+                                 case 1:
+                                     startRemotePause();
+                                     status=PAUSE;
+                                 break;
+                                 case 2:
+                                     mediaPlayer.stop();
+                                     mediaPlayer.reset();
+                                     status = PAUSE;
+                                     lastTime = SystemClock.elapsedRealtime();
+                                 break;
                              }
-
                         }
-                        /*else if (status == STOP) {
+                        else if (status == STOP) {
                             v.setBackgroundResource(R.drawable.ic_pause_black_36dp);
                             initText();
-                            startPlay(0, status);
                             status = ON;
-                        }*/
+                            switch (MODE){
+                                case 1:
+                                    General.COLUN_STATUS = General.PLAYING;
+                                    sendStatus=ON;
+                                    startRemotePlay(lastMusPos);
+                                    break;
+                                case 2:
+                                    startPlay(0, status);
+                                    break;
+                            }
+                        }
                         return true;
                 }
                 return false;
@@ -192,28 +197,52 @@ public class MainActivity extends AppCompatActivity {
         MplayNext.setOnTouchListener(new View.OnTouchListener() {
             @Override
             public boolean onTouch(View v, MotionEvent event) {
-               /* switch (event.getAction()) {
+                switch (event.getAction()) {
                     case MotionEvent.ACTION_DOWN:
                         v.setBackgroundColor(Color.rgb(230, 230, 230));
                         return true;
                     case MotionEvent.ACTION_UP:
-
                         v.setBackgroundColor(Color.WHITE);
                         lastMusPos++;
                         if (lastMusPos >= musicUnits.size()) lastMusPos = 0;
                         musicName.setText(musicUnits.get(lastMusPos).Mname);
                         musicAuthor.setText(musicUnits.get(lastMusPos).MAuthor);
-                        startPlay(lastMusPos, status);
+                        switch (MODE){
+                            case 1:
+                                if(status==STOP){
+                                    General.COLUN_STATUS = General.PLAYING;
+                                    sendStatus=ON;
+                                    General.setLSNotReadyToPlay();
+                                    startRemotePlay(lastMusPos);
+                                    General.playWhenIsReady();
+                                }else{
+                                    stopRemotePlay();
+                                    while(General.COUNT_TO_CHECK!=0){};
+                                    General.setLSNotReadyToPlay();
+                                    status = ON;
+                                    if(sendStatus==STOP){
+                                        General.COLUN_STATUS = General.PLAYING;
+                                        sendStatus=ON;
+                                        startRemotePlay(lastMusPos);
+                                        General.playWhenIsReady();
+                                    }
+                                }
+                                break;
+                            case 2:
+                                startPlay(lastMusPos, status);
+                                break;
+                        }
+
 
                         return true;
-                }*/
+                }
                 return false;
             }
         });
         MplayPrev.setOnTouchListener(new View.OnTouchListener() {
             @Override
             public boolean onTouch(View v, MotionEvent event) {
-             /*   switch (event.getAction()) {
+                switch (event.getAction()) {
                     case MotionEvent.ACTION_DOWN:
                         v.setBackgroundColor(Color.rgb(230, 230, 230));
                         return true;
@@ -223,13 +252,36 @@ public class MainActivity extends AppCompatActivity {
                         if (lastMusPos < 0) lastMusPos = musicUnits.size() - 1;
                         musicName.setText(musicUnits.get(lastMusPos).Mname);
                         musicAuthor.setText(musicUnits.get(lastMusPos).MAuthor);
-                        startPlay(lastMusPos, status);
+                         switch (MODE){
+                            case 1:
+                                if(status==STOP){
+                                    General.COLUN_STATUS = General.PLAYING;
+                                    sendStatus=ON;
+                                    General.setLSNotReadyToPlay();
+                                    startRemotePlay(lastMusPos);
+                                    General.playWhenIsReady();
+                                }else{
+                                    stopRemotePlay();
+                                    while(General.COUNT_TO_CHECK!=0){};
+                                    General.setLSNotReadyToPlay();
+                                    status = ON;
+                                    if(sendStatus==STOP){
+                                        General.COLUN_STATUS = General.PLAYING;
+                                        sendStatus=ON;
+                                        startRemotePlay(lastMusPos);
+                                        General.playWhenIsReady();
+                                    }
+                                }
+                                break;
+                            case 2:
+                                startPlay(lastMusPos, status);
+                                break;
+                        }
                         return true;
-                }*/
+                }
                 return false;
             }
         });
-
 
     }
 
@@ -238,6 +290,7 @@ public class MainActivity extends AppCompatActivity {
         getMenuInflater().inflate(R.menu.menu, menu);
         return true;
     }
+
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         switch(item.getItemId()) {
@@ -250,7 +303,6 @@ public class MainActivity extends AppCompatActivity {
         }
         return(super.onOptionsItemSelected(item));
     }
-
 
     public void startPlay( int position, final Integer status){
         if(status==ON || status ==PAUSE){
@@ -275,7 +327,7 @@ public class MainActivity extends AppCompatActivity {
         
         File file = new File(musicUnits.get(position).Path);
         byte[] buff = new byte[128];
-        Log.e("ERR",Long.toString(file.length()));
+        Log.e("ERR", Long.toString(file.length()));
         try {
             InputStream is = new FileInputStream(file);
 
@@ -308,7 +360,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-public void initViews(){
+    public void initViews(){
     listmusic = (ListView) findViewById(R.id.listViewMusic);
     musicName = (TextView) findViewById(R.id.MusicName2);
     musicAuthor = (TextView) findViewById(R.id.MusicAuthor2);
@@ -319,6 +371,7 @@ public void initViews(){
     //mChronometer = (Chronometer) findViewById(R.id.chronometer);
 
 }
+
     public void initText(){
         if(musicUnits.size()!=0){
             musicName.setText(musicUnits.get(0).Mname);
@@ -326,6 +379,98 @@ public void initViews(){
         }
     }
 
+    public void startRemotePlay(final int position){
+        //Log.e("startRemotePlay","Start");
+        for(int i=0; i<General.LUnits.size();i++){
+            if(General.LUnits.get(i).status==General.SYNC&&General.LUnits.get(i).turn==General.TURN_ON){
+                final int finalI = i;
+                Thread thrd_start_play = new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        General.sendData(finalI,
+                                musicUnits.get(position).Path,
+                                musicUnits.get(position).Mname,
+                                musicUnits.get(position).MDuration,
+                                musicUnits.get(position).formatIndex);
+                    }
+                });
+                thrd_start_play.start();
 
+            }
+
+        }
+        //Log.e("startRemotePlay","Stop");
+    }
+
+    public void stopRemotePlay(){
+        //Log.e("stopRemotePlay","Start");
+        if(status==ON||status==PAUSE){
+            General.COUNT_TO_CHECK=0;
+            sendStatus=STOP;
+            status=STOP;
+            for(int i=0; i<General.LUnits.size();i++){
+                if(General.LUnits.get(i).status==General.SYNC&&General.LUnits.get(i).turn==General.TURN_ON){
+                    General.COUNT_TO_CHECK++;
+                    final int finalI = i;
+                    Thread thrd_stop_play = new Thread(new Runnable() {
+                        @Override
+                        public void run() {
+                            General.sendStopPlay(General.LUnits.get(finalI).ip,General.LUnits.get(finalI).port);
+
+                        }
+                    });
+                    thrd_stop_play.start();
+                }
+            }
+        }
+        //Log.e("stopRemotePlay","WHILE");
+        while(General.COLUN_STATUS==General.PLAYING){}//needs resend if packet is lost
+        status=ON;
+       // Log.e("stopRemotePlay","END");
+    }
+
+    public void startRemotePause(){
+        if(status==ON){
+            for(int i=0; i<General.LUnits.size();i++){
+                if(General.LUnits.get(i).status==General.SYNC&&General.LUnits.get(i).turn==General.TURN_ON){
+
+                    final int finalI = i;
+                    Thread thrd_stop_play = new Thread(new Runnable() {
+                        @Override
+                        public void run() {
+                            General.sendPauseStart(General.LUnits.get(finalI).ip, General.LUnits.get(finalI).port);
+                        }
+                    });
+                    thrd_stop_play.start();
+                }
+            }
+        }
+    }
+
+    public void stopRemotePause(){
+        if(status==PAUSE){
+            for(int i=0; i<General.LUnits.size();i++){
+                if(General.LUnits.get(i).status==General.SYNC&&General.LUnits.get(i).turn==General.TURN_ON){
+
+                    final int finalI = i;
+                    Thread thrd_stop_play = new Thread(new Runnable() {
+                        @Override
+                        public void run() {
+                            General.sendPauseStop(General.LUnits.get(finalI).ip, General.LUnits.get(finalI).port);
+                        }
+                    });
+                    thrd_stop_play.start();
+                }
+            }
+        }
+    }
+
+    public void sleep(int sec){
+        Long sendTime  = System.currentTimeMillis();
+        while(1==1) {
+            if(System.currentTimeMillis()-sendTime>sec)break;
+            else sendTime  = System.currentTimeMillis();
+        }
+    }
 
 }

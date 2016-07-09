@@ -9,8 +9,9 @@ public class LoudspeakerUnits {
     public String ip;
     public int  port;
     public Long tstamp;
-    public  Integer turn;
+    public Integer turn;
     public Integer FF;
+    public Integer isReadyToPlay;
     public LoudspeakerUnits(String name, byte canal, Integer id, Integer status,String ip,int port, Long tstamp,Integer turn){
         this.name = name;
         this.canal = canal;
@@ -21,5 +22,6 @@ public class LoudspeakerUnits {
         this.turn = turn;
         this.port = port;
         this.FF = General.NYES;
+        this.isReadyToPlay=0;
     }
 }

@@ -30,6 +30,8 @@ import java.security.Timestamp;
 import java.sql.Time;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.concurrent.TimeUnit;
 
 import javazoom.jl.decoder.Bitstream;
@@ -37,6 +39,7 @@ import javazoom.jl.decoder.BitstreamException;
 import javazoom.jl.decoder.Decoder;
 import javazoom.jl.decoder.DecoderException;
 import javazoom.jl.decoder.Header;
+import javazoom.jl.decoder.OutputChannels;
 import javazoom.jl.decoder.SampleBuffer;
 
 public  class General {
@@ -51,6 +54,7 @@ public  class General {
     public static Integer  STOPED = 2;
     public static Integer  PLAYING = 1;
     public static Integer COLUN_STATUS=STOPED;
+    public static Integer COUNT_TO_CHECK;
 
     public  static  Integer SERVER_STATUS=SERVER_OFF;
     public static DatagramSocket serversocket;
@@ -124,7 +128,6 @@ public  class General {
                                             packet.getPort(),
                                             now,
                                             TURN_OFF));
-
                                 }else if(LUnits.get(pos).status==General.INIT_ACK){
                                     sendInitAck(pos);
                                 }
@@ -139,9 +142,15 @@ public  class General {
                                     LUnits.get(packet.getData()[1]).FF=General.CYES;
                                 break;
                             case 0x32:
-                                Log.e("STOPING","STOPED");
-                                    General.COLUN_STATUS=STOPED;
-                                break;
+                                   //Log.e("SERVER","sendStatus = "+Integer.toString( MainActivity.sendStatus) );
+                                   COUNT_TO_CHECK--;
+                                   MainActivity.sendStatus=MainActivity.STOP;
+                                   COLUN_STATUS=STOPED;
+                            break;
+                            case 0x51:
+                                sendConfirmToReadyToPlay(General.LUnits.get(packet.getData()[1]).ip,
+                                        General.LUnits.get(packet.getData()[1]).port);
+                                LUnits.get(packet.getData()[1]).isReadyToPlay = 1;
                         }
                         for (int i=0;i<rxBuff.length;i++) rxBuff[i]='\0';
                     }
@@ -215,8 +224,50 @@ public  class General {
     }
 
     public static void sendStopPlay(String ip, int port) {
+        Log.e("sendStopPlay","START");
         byte [] rxBuff = new byte[1];
         rxBuff[0]=0x31;
+        final DatagramPacket packet= new DatagramPacket(rxBuff, rxBuff.length);
+        try {
+            packet.setAddress(InetAddress.getByName(ip));
+            packet.setPort(port);
+            serversocket.send(packet);
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public  static void sendPauseStart(String ip, int port){
+        //Log.e("sendPauseStart","START");
+        byte [] rxBuff = new byte[1];
+        rxBuff[0]=0x41;
+        final DatagramPacket packet= new DatagramPacket(rxBuff, rxBuff.length);
+        try {
+            packet.setAddress(InetAddress.getByName(ip));
+            packet.setPort(port);
+            serversocket.send(packet);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public  static void sendStartPlaying(String ip, int port){
+        byte [] rxBuff = new byte[1];
+        rxBuff[0]=0x53;
+        final DatagramPacket packet= new DatagramPacket(rxBuff, rxBuff.length);
+        try {
+            packet.setAddress(InetAddress.getByName(ip));
+            packet.setPort(port);
+            serversocket.send(packet);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public static void sendConfirmToReadyToPlay(String ip, int port) {
+        byte [] rxBuff = new byte[1];
+        rxBuff[0]=0x52;
         final DatagramPacket packet= new DatagramPacket(rxBuff, rxBuff.length);
         try {
             packet.setAddress(InetAddress.getByName(ip));
@@ -238,12 +289,27 @@ public  class General {
         }
     }
 
-    private static void sendDataInit(int pos,String PATH,String name, int formatIndex){
+    public  static void sendPauseStop(String ip, int port){
+        //Log.e("sendPauseStop","START");
+        byte [] rxBuff = new byte[1];
+        rxBuff[0]=0x42;
+        final DatagramPacket packet= new DatagramPacket(rxBuff, rxBuff.length);
+        try {
+            packet.setAddress(InetAddress.getByName(ip));
+            packet.setPort(port);
+            serversocket.send(packet);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static boolean sendDataInit(int pos,String PATH,String name, int formatIndex){
         try {
             byte [] rxBuff = new byte[200];
             byte[] BName = name.getBytes();
             Long  sendTime;
             long fileSize;
+            int resendCount=0;
             File file = new File(PATH);
             final DatagramPacket packet= new DatagramPacket(rxBuff,1);
             packet.setAddress(InetAddress.getByName(LUnits.get(pos).ip));
@@ -265,22 +331,27 @@ public  class General {
                 serversocket.send(packet);
                 sendTime = System.currentTimeMillis();
                 while (LUnits.get(pos).FF == General.NYES) {
+                    if(resendCount>5)return false;
                     if (System.currentTimeMillis() - sendTime > 2000) {
                         serversocket.send(packet);
                         sendTime = System.currentTimeMillis();
-                        Log.e("RESEND", "DataInit");
+                        Log.e("RESEND", "DataInit" + Integer.toString(resendCount));
+                        resendCount++;
                     }
                 }
                 Log.e("OPEN", "Confirmed");
                 LUnits.get(pos).FF = General.NYES;
+                return true;
             }
             //----------------------------------------
         } catch (UnknownHostException e) {
-            e.printStackTrace();
+            Log.e("sendDataInit", e.toString());
+            return false;
         } catch (IOException e) {
-            e.printStackTrace();
+            Log.e("sendDataInit", e.toString());
+            return false;
         }
-
+        return false;
     }
 
     private static void sendDataEnd(int pos){
@@ -290,6 +361,7 @@ public  class General {
             final DatagramPacket packet= new DatagramPacket(rxBuff,1);
             packet.setAddress(InetAddress.getByName(LUnits.get(pos).ip));
             packet.setPort(LUnits.get(pos).port);
+            Integer resendCount=0;
             //------------------0x06------------------
             if(MainActivity.status==MainActivity.ON) {
                 rxBuff[0] = 0x06;
@@ -298,10 +370,12 @@ public  class General {
                 serversocket.send(packet);
                 sendTime = System.currentTimeMillis();
                 while (LUnits.get(pos).FF == General.NYES) {
+                    if(resendCount>5)break;
                     if (System.currentTimeMillis() - sendTime > 2000) {
                         serversocket.send(packet);
                         sendTime = System.currentTimeMillis();
                         Log.e("RESEND", "Data End");
+                        resendCount++;
                     }
                 }
                 Log.e("CLOSE", "Confirmed");
@@ -310,15 +384,16 @@ public  class General {
             //----------------------------------------
 
         } catch (UnknownHostException e) {
-            e.printStackTrace();
+
         } catch (IOException e) {
-            e.printStackTrace();
+
         }
 
     }
 
-    private static void senDataBodyMP3(int pos, Integer duration, String PATH){
+    private static boolean senDataBodyMP3(int pos, Integer duration, String PATH){
         try {
+            //Log.e("senDataBodyMP3","sendStatus="+ Integer.toString(MainActivity.sendStatus));
             byte [] rxBuff = new byte[1500];
             byte[] byteData = null;
             int startTimeRead=0;
@@ -329,19 +404,20 @@ public  class General {
             int count=1;
             Integer byte_read=0;
             Long  sendTime;
+            Integer resendCount=0;
             final DatagramPacket packet= new DatagramPacket(rxBuff,1);
             packet.setAddress(InetAddress.getByName(LUnits.get(pos).ip));
             packet.setPort(LUnits.get(pos).port);
             //------------------0x05------------------
             rxBuff[0]=0x05;
             //all+=byte_read;
-            while(startTimeRead<duration&& MainActivity.status == MainActivity.ON) {
+            while(startTimeRead<duration&& MainActivity.sendStatus == MainActivity.ON) {
                 posByteToSend=0;
                 byteData=null;
                 byteData = General.decode_path(PATH,startTimeRead,1000);
                 //Log.e("BUFF", Integer.toString(byteData.length)+" POS "+ Integer.toString(startTimeRead));
                 startTimeRead+=1000;
-                while (posByteToSend<byteData.length&& MainActivity.status == MainActivity.ON) {
+                while (posByteToSend<byteData.length&& MainActivity.sendStatus == MainActivity.ON) {
                     if(byteData.length-posByteToSend>=1024)countToSend=1024;
                     else countToSend = byteData.length-posByteToSend;
                     rxBuff[1] = (byte) (count >> 0);
@@ -357,29 +433,36 @@ public  class General {
                     serversocket.send(packet);
                     sendTime = System.currentTimeMillis();
                     while (LUnits.get(pos).FF == General.NYES) {
+                        if(resendCount>10){
+                            sendStopPlay(LUnits.get(pos).ip,LUnits.get(pos).port);
+                            return false;
+                        }
                         if (System.currentTimeMillis() - sendTime > 2000) {
                             serversocket.send(packet);
                             sendTime = System.currentTimeMillis();
-                            Log.e("RESEND", "Pack " + Integer.toString(count));
+                            Log.e("RESEND", "Pack " + Integer.toString(count) + " "+ Integer.toString(resendCount));
+                            resendCount++;
                         }
                     }
                     //Log.e("SENT", "Pack " + Integer.toString(count) + " confirmed " + Integer.toString(countToSend) + "bytes");
                     LUnits.get(pos).FF = General.NYES;
                     count++;
                     posByteToSend+=countToSend;
+                    resendCount=0;
                 }
             }
+            return true;//Were send all datd
             //----------------------------------------
 
         } catch (UnknownHostException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
 
+        } catch (IOException e) {
+
+        }
+        return false;
     }
 
-    private static void sendDataBodyWAV(int pos, String PATH, String name){
+    private static boolean sendDataBodyWAV(int pos, String PATH, String name){
         try {
             byte [] rxBuff = new byte[1500];
             byte[] BName = name.getBytes();
@@ -389,13 +472,14 @@ public  class General {
             Integer all=0;
             int count=1;
             Integer byte_read=0;
+            Integer resendCount=0;
             InputStream is = new FileInputStream(file);
             final DatagramPacket packet= new DatagramPacket(rxBuff,1);
             packet.setAddress(InetAddress.getByName(LUnits.get(pos).ip));
             packet.setPort(LUnits.get(pos).port);
             //------------------0x05------------------
             rxBuff[0]=0x05;
-            while((byte_read=is.read(FBody,0,1024))!=-1&&MainActivity.status==MainActivity.ON){
+            while((byte_read=is.read(FBody,0,1024))!=-1&&MainActivity.sendStatus==MainActivity.ON){
                 rxBuff[1]=(byte)(count>>0);
                 rxBuff[2]=(byte)(count>>8);
                 rxBuff[3]=(byte)(count>>16);
@@ -408,16 +492,23 @@ public  class General {
                 serversocket.send(packet);
                 sendTime=System.currentTimeMillis();
                 while (LUnits.get(pos).FF==General.NYES){
+                    if(resendCount>10){
+                        sendStopPlay(LUnits.get(pos).ip,LUnits.get(pos).port);
+                        return false;
+                    }
                     if(System.currentTimeMillis()-sendTime>2000){
                         serversocket.send(packet);
                         sendTime=System.currentTimeMillis();
-                        Log.e("RESEND","Pack "+Integer.toString(count));
+                        Log.e("RESEND","Pack "+Integer.toString(count) + " "+ Integer.toString(resendCount));
+                        resendCount++;
                     }
                 }
                 //Log.e("SENT","Pack "+Integer.toString(count)+" confirmed " + Integer.toString(byte_read)+ "bytes");
                 LUnits.get(pos).FF = General.NYES;
                 count++;
+                resendCount=0;
             }
+            return  true;
             //----------------------------------------
 
         } catch (UnknownHostException e) {
@@ -425,22 +516,23 @@ public  class General {
         } catch (IOException e) {
             e.printStackTrace();
         }
+        return  false;
     }
 
-    public  static void sendData(int pos, String PATH, String name, Integer duration,int formatIndex){
-        sendDataInit(pos,PATH,name,formatIndex);
+    public  static boolean sendData(int pos, String PATH, String name, Integer duration,int formatIndex){
+        if(!sendDataInit(pos, PATH, name, formatIndex))return false;
         switch (formatIndex){
             case 1:
-                sendDataBodyWAV(pos,PATH,name);
+                if(!sendDataBodyWAV(pos,PATH,name))return false;
                 break;
             case 2:
                 break;
             case 3:
-                senDataBodyMP3(pos,duration,PATH);
+                if(!senDataBodyMP3(pos,duration,PATH))return  false;
                 break;
         }
         sendDataEnd(pos);
-
+        return true;
     }
 
     public int existsId(int id){
@@ -474,7 +566,17 @@ public  class General {
         InputStream inputStream = new BufferedInputStream(new FileInputStream(file), 8 * 1024);
         try {
             Bitstream bitstream = new Bitstream(inputStream);
-            Decoder decoder = new Decoder();
+            Decoder.Params params = new Decoder.Params();
+           // Log.e("Params", Integer.toString(params.getOutputChannels().getChannelCount()));
+            params.setOutputChannels(OutputChannels.LEFT);
+            //Log.e("Params1", Integer.toString(params.getOutputChannels().getChannelCount()));
+            Decoder decoder = new Decoder(params);
+           // Log.e("getOutputChannels", Integer.toString(decoder.getOutputChannels()));
+            Decoder.Params qwe =  Decoder.getDefaultParams();
+           // Log.e("getOutputChannels",Integer.toString(qwe.getOutputChannels().getChannelCount()));
+            //decoder.getOutputChannels()
+
+            //
 
             boolean done = false;
             while (! done) {
@@ -483,24 +585,27 @@ public  class General {
                     done = true;
                 } else {
                     totalMs += frameHeader.ms_per_frame();
-
+                    //Log.e("getOutputChannels",Integer.toString(frameHeader.bitrate()));
                     if (totalMs >= startMs) {
                         seeking = false;
                     }
 
                     if (! seeking) {
+                        //SampleBuffer output = new SampleBuffer(44100,1);
                         SampleBuffer output = (SampleBuffer) decoder.decodeFrame(frameHeader, bitstream);
 
+                        //Log.e("getBufferLength",Integer.toString(output.getBufferLength()));
                         if (output.getSampleFrequency() != 44100
                                 || output.getChannelCount() != 2) {
                             throw new IllegalArgumentException("mono or non-44100 MP3 not supported");
                         }
-
+                        //output.append(1,(short)1);
                         short[] pcm = output.getBuffer();
                         for (short s : pcm) {
-                            outStream.write(s & 0xff);
-                            outStream.write((s >> 8 ) & 0xff);
+                             outStream.write(s & 0xff);
+                             outStream.write((s >> 8) & 0xff);
                         }
+
                     }
 
                     if (totalMs >= (startMs + maxMs)) {
@@ -516,6 +621,51 @@ public  class General {
         } catch (DecoderException e) {
             Log.e("DEC_ERROR", "Decoder error", e);
             throw new IOException("Decoder error: " + e);
+        }
+    }
+
+    public static boolean LSReadyToPlay(){
+        int i;
+        for (i=0;i<LUnits.size();i++){
+            if(General.LUnits.get(i).status==General.SYNC&&General.LUnits.get(i).turn==General.TURN_ON){
+                if(LUnits.get(i).isReadyToPlay==0){
+                    return false;
+                }
+            }
+        }
+        return  true;
+    }
+
+    public static void playWhenIsReady(){
+        Thread thrd_play = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                Long sendTime  = System.currentTimeMillis();
+                while(1==1) {
+                    if (System.currentTimeMillis() - sendTime > 2000) {
+                        if (General.LSReadyToPlay()) {
+                            for (int i = 0; i < LUnits.size(); i++) {
+                                if (General.LUnits.get(i).status == General.SYNC && General.LUnits.get(i).turn == General.TURN_ON) {
+                                    sendStartPlaying(General.LUnits.get(i).ip, General.LUnits.get(i).port);
+                                }
+                            }
+                            break;
+                        }
+                        else{
+                            sendTime  = System.currentTimeMillis();
+                        }
+                    }
+                }
+
+            }
+        });
+        thrd_play.start();
+
+    }
+
+    public static void setLSNotReadyToPlay(){
+        for(int i=0;i<LUnits.size();i++){
+            LUnits.get(i).isReadyToPlay=0;
         }
     }
 
