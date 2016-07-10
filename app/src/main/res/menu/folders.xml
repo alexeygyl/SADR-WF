@@ -2,14 +2,10 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools" tools:context=".MainActivity">
 
+
     <item
-        android:id="@+id/Loudspeakers"
-        android:icon="@drawable/ic_playlist_play_white_36dp"
-        app:showAsAction="always"
-        android:title="Loudspeakers" />
-    <item
-        android:id="@+id/Folders"
-        android:icon="@drawable/ic_folder_white_24dp"
+        android:id="@+id/NewFolder"
+        android:icon="@drawable/ic_create_new_folder_white_24dp"
         app:showAsAction="always"
         android:title="Loudspeakers" />
 

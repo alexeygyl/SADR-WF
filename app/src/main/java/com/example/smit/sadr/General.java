@@ -61,16 +61,23 @@ public  class General {
     public  static Integer CYES = 1;
     public  static Integer NYES = 2;
     public static List<LoudspeakerUnits> LUnits = new ArrayList<LoudspeakerUnits>();
-    public  static List<MusicUnits> getMusicList(String PATH){
-        List<MusicUnits> musicList = new ArrayList<MusicUnits>();
-        File file = new File(PATH);
-        File [] fileList = file.listFiles();
+    public  static List<String> folderUnits = new ArrayList<String>();
 
-        for (Integer i=0;i<fileList.length;i++){
-            String format =  fileList[i].getName().substring(fileList[i].getName().lastIndexOf(".") + 1, fileList[i].getName().length());
-            if(format.equals("wav")) musicList.add(new MusicUnits(fileList[i].getName(),"Unknown",fileList[i].getAbsolutePath(),1));
-            else if(format.equals("flac")) musicList.add(new MusicUnits(fileList[i].getName(),"Unknown",fileList[i].getAbsolutePath(),2));
-            else if(format.equals("mp3")) musicList.add(new MusicUnits(fileList[i].getName(),"Unknown",fileList[i].getAbsolutePath(),3));
+    public  static List<MusicUnits> getMusicList(List<String> folders){
+        List<MusicUnits> musicList = new ArrayList<MusicUnits>();
+        for(String folder : folders) {
+            File file = new File(folder);
+            File[] fileList = file.listFiles();
+            Log.e("asdasd", folder);
+            for (Integer i = 0; i < fileList.length; i++) {
+                String format = fileList[i].getName().substring(fileList[i].getName().lastIndexOf(".") + 1, fileList[i].getName().length());
+                if (format.equals("wav"))
+                    musicList.add(new MusicUnits(fileList[i].getName(), "Unknown", fileList[i].getAbsolutePath(), 1));
+                else if (format.equals("flac"))
+                    musicList.add(new MusicUnits(fileList[i].getName(), "Unknown", fileList[i].getAbsolutePath(), 2));
+                else if (format.equals("mp3"))
+                    musicList.add(new MusicUnits(fileList[i].getName(), "Unknown", fileList[i].getAbsolutePath(), 3));
+            }
         }
         return musicList;
     }
@@ -224,7 +231,7 @@ public  class General {
     }
 
     public static void sendStopPlay(String ip, int port) {
-        Log.e("sendStopPlay","START");
+        //Log.e("sendStopPlay","START");
         byte [] rxBuff = new byte[1];
         rxBuff[0]=0x31;
         final DatagramPacket packet= new DatagramPacket(rxBuff, rxBuff.length);
@@ -411,7 +418,9 @@ public  class General {
             //------------------0x05------------------
             rxBuff[0]=0x05;
             //all+=byte_read;
+            MainActivity.vProgressBar.setMax(duration);
             while(startTimeRead<duration&& MainActivity.sendStatus == MainActivity.ON) {
+                MainActivity.vProgressBar.setProgress(startTimeRead);
                 posByteToSend=0;
                 byteData=null;
                 byteData = General.decode_path(PATH,startTimeRead,1000);
@@ -473,13 +482,18 @@ public  class General {
             int count=1;
             Integer byte_read=0;
             Integer resendCount=0;
+            Integer allByteRead=0;
             InputStream is = new FileInputStream(file);
             final DatagramPacket packet= new DatagramPacket(rxBuff,1);
             packet.setAddress(InetAddress.getByName(LUnits.get(pos).ip));
             packet.setPort(LUnits.get(pos).port);
+            MainActivity.vProgressBar.setMax((int)file.length());
             //------------------0x05------------------
+
             rxBuff[0]=0x05;
             while((byte_read=is.read(FBody,0,1024))!=-1&&MainActivity.sendStatus==MainActivity.ON){
+                allByteRead+=byte_read;
+                MainActivity.vProgressBar.setProgress(allByteRead);
                 rxBuff[1]=(byte)(count>>0);
                 rxBuff[2]=(byte)(count>>8);
                 rxBuff[3]=(byte)(count>>16);

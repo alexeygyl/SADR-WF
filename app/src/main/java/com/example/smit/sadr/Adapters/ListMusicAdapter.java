@@ -67,6 +67,18 @@ public class ListMusicAdapter extends ArrayAdapter<MusicUnits>  {
         }else if (s.substring(0,1).equalsIgnoreCase("K")) {
             imageView.setImageResource(R.drawable.alph_k);
         }
+        else if (s.substring(0,1).equalsIgnoreCase("S")) {
+            imageView.setImageResource(R.drawable.alph_s);
+        }
+        else if (s.substring(0,1).equalsIgnoreCase("M")) {
+            imageView.setImageResource(R.drawable.alph_m);
+        }
+        else if (s.substring(0,1).equalsIgnoreCase("X")) {
+            imageView.setImageResource(R.drawable.alph_x);
+        }
+        else if (s.substring(0,1).equalsIgnoreCase("Z")) {
+            imageView.setImageResource(R.drawable.alph_z);
+        }
         return rowView;
     }
 }

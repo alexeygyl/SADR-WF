@@ -25,6 +25,7 @@ import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ImageButton;
 import android.widget.ListView;
+import android.widget.ProgressBar;
 import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -49,6 +50,7 @@ public class MainActivity extends AppCompatActivity {
      public List<MusicUnits> musicUnits = new ArrayList<MusicUnits>();
 
     ImageButton Mplay;
+    ImageButton Mstop;
     ImageButton MplayNext;
     ImageButton MplayPrev;
     static Integer ON =1;
@@ -59,33 +61,40 @@ public class MainActivity extends AppCompatActivity {
     Integer lastMusPos = 0;
     Long lastTime;
     MediaPlayer mediaPlayer;
-    SeekBar seekBar;
+    //SeekBar seekBar;
     Handler seekHandler = new Handler();
     TextView musicName;
     TextView musicAuthor;
     ListView listmusic;
     TextView mDuration;
     static Integer MODE=1;
+    ListMusicAdapter adapter;
+    public  static ProgressBar vProgressBar;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         initViews();
-        musicUnits = General.getMusicList(Environment.getExternalStorageDirectory().toString()+"/Audio");
+        if(!General.folderUnits.contains(Environment.getExternalStorageDirectory().toString() + "/Audio"))
+                                General.folderUnits.add(Environment.getExternalStorageDirectory().toString() + "/Audio");
+       /* if(!General.folderUnits.contains("/storage/extSdCard/Music"))
+            General.folderUnits.add("/storage/extSdCard/Music");*/
+        musicUnits = General.getMusicList(General.folderUnits);
         initText();
-        seekBar = (SeekBar) findViewById(R.id.seekBar);
-        //seekBar.setBackgroundColor(Color.rgb(255,213,0));
+        vProgressBar = (ProgressBar)findViewById(R.id.vprogressbar);
+        //seekBar = (SeekBar) findViewById(R.id.seekBar);
         Mplay.setBackgroundColor(Color.WHITE);
         Mplay.setBackgroundResource(R.drawable.ic_play_arrow_black_36dp);
         musicName.setMaxWidth(350);
         musicName.setTextColor(Color.WHITE);
         musicAuthor.setTextColor(Color.WHITE);
         getSupportActionBar().setBackgroundDrawable(new ColorDrawable(Color.rgb(40, 40, 40)));
-        listmusic.setAdapter(new ListMusicAdapter(this, musicUnits));
+        adapter = new ListMusicAdapter(this, musicUnits);
+        listmusic.setAdapter(adapter);
         mediaPlayer = new MediaPlayer();
 
-        seekBar.setOnTouchListener(new View.OnTouchListener() {
+     /*   seekBar.setOnTouchListener(new View.OnTouchListener() {
             @Override
             public boolean onTouch(View v, MotionEvent event) {
                 if (status != STOP) {
@@ -94,7 +103,7 @@ public class MainActivity extends AppCompatActivity {
                 }
                 return false;
             }
-        });
+        });*/
 
         listmusic.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
@@ -102,35 +111,37 @@ public class MainActivity extends AppCompatActivity {
                 musicName.setText(musicUnits.get(position).Mname);
                 musicAuthor.setText(musicUnits.get(position).MAuthor);
                 //getMetaMp3Info(position);
-                switch (MODE){
+                switch (MODE) {
                     case 1:
-                        if(status==STOP){
+                        if (status == STOP) {
                             status = ON;
-                            if(sendStatus==STOP){
+                            if (sendStatus == STOP) {
                                 General.COLUN_STATUS = General.PLAYING;
-                                sendStatus=ON;
+                                sendStatus = ON;
                                 General.setLSNotReadyToPlay();
                                 startRemotePlay(position);
                                 General.playWhenIsReady();
                             }
-                        }else{
+                        } else {
                             //Log.e("Status","PAUSE, Play new comp");
                             stopRemotePlay();
-                            while(General.COUNT_TO_CHECK!=0){};
+                            while (General.COUNT_TO_CHECK != 0) {
+                            }
+                            ;
                             General.setLSNotReadyToPlay();
                             status = ON;
-                            if(sendStatus==STOP){
+                            if (sendStatus == STOP) {
                                 General.COLUN_STATUS = General.PLAYING;
-                                sendStatus=ON;
+                                sendStatus = ON;
                                 startRemotePlay(position);
                                 General.playWhenIsReady();
                             }
                         }
-                    break;
+                        break;
                     case 2:
                         status = ON;
                         startPlay(lastMusPos, status);
-                    break;
+                        break;
                 }
                 Mplay.setBackgroundResource(R.drawable.ic_pause_black_36dp);
                 lastMusPos = position;
@@ -150,37 +161,36 @@ public class MainActivity extends AppCompatActivity {
                             switch (MODE) {
                                 case 1:
                                     stopRemotePause();
-                                    status=ON;
-                                break;
+                                    status = ON;
+                                    break;
                                 case 2:
                                     mediaPlayer.start();
                                     startPlayProgressUpdater();
                                     status = ON;
-                                break;
+                                    break;
                             }
-                        }else if (status == ON) {
+                        } else if (status == ON) {
                             v.setBackgroundResource(R.drawable.ic_play_arrow_black_36dp);
-                             switch (MODE){
-                                 case 1:
-                                     startRemotePause();
-                                     status=PAUSE;
-                                 break;
-                                 case 2:
-                                     mediaPlayer.stop();
-                                     mediaPlayer.reset();
-                                     status = PAUSE;
-                                     lastTime = SystemClock.elapsedRealtime();
-                                 break;
-                             }
-                        }
-                        else if (status == STOP) {
+                            switch (MODE) {
+                                case 1:
+                                    startRemotePause();
+                                    status = PAUSE;
+                                    break;
+                                case 2:
+                                    mediaPlayer.stop();
+                                    mediaPlayer.reset();
+                                    status = PAUSE;
+                                    lastTime = SystemClock.elapsedRealtime();
+                                    break;
+                            }
+                        } else if (status == STOP) {
                             v.setBackgroundResource(R.drawable.ic_pause_black_36dp);
                             initText();
                             status = ON;
-                            switch (MODE){
+                            switch (MODE) {
                                 case 1:
                                     General.COLUN_STATUS = General.PLAYING;
-                                    sendStatus=ON;
+                                    sendStatus = ON;
                                     startRemotePlay(lastMusPos);
                                     break;
                                 case 2:
@@ -283,6 +293,15 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
+        Mstop.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if(status==ON){
+                    stopRemotePlay();
+                }
+            }
+        });
+
     }
 
     @Override
@@ -295,10 +314,12 @@ public class MainActivity extends AppCompatActivity {
     public boolean onOptionsItemSelected(MenuItem item) {
         switch(item.getItemId()) {
             case R.id.Loudspeakers:
-                Intent intent = new Intent(this,Loudspeakers.class);
-                startActivity(intent);
-
-
+                Intent LoudspeakersActivity = new Intent(this,Loudspeakers.class);
+                startActivity(LoudspeakersActivity);
+                return true;
+            case R.id.Folders:
+                Intent FoldersActivity = new Intent(this,Folders.class);
+                startActivityForResult(FoldersActivity,1);
                 return true;
         }
         return(super.onOptionsItemSelected(item));
@@ -313,8 +334,8 @@ public class MainActivity extends AppCompatActivity {
             mediaPlayer.setDataSource(musicUnits.get(position).Path);
             mediaPlayer.prepare();
             mediaPlayer.start();
-            seekBar.setProgress(0);
-            seekBar.setMax(mediaPlayer.getDuration());
+            //seekBar.setProgress(0);
+            //seekBar.setMax(mediaPlayer.getDuration());
             startPlayProgressUpdater();
 
         } catch (IOException e) {
@@ -346,7 +367,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void startPlayProgressUpdater() {
-        seekBar.setProgress(mediaPlayer.getCurrentPosition());
+        /*//seekBar.setProgress(mediaPlayer.getCurrentPosition());
         mDuration.setText(General.getStrTime(mediaPlayer.getCurrentPosition()));
         if (mediaPlayer.isPlaying()) {
             Runnable notification = new Runnable() {
@@ -357,7 +378,7 @@ public class MainActivity extends AppCompatActivity {
             seekHandler.postDelayed(notification,1000);
         }else{
             mediaPlayer.pause();
-        }
+        }*/
     }
 
     public void initViews(){
@@ -368,6 +389,7 @@ public class MainActivity extends AppCompatActivity {
     MplayNext = (ImageButton) findViewById(R.id.MplayNext);
     MplayPrev = (ImageButton) findViewById(R.id.MplayPrev);
     mDuration = (TextView)findViewById(R.id.mDuration);
+    Mstop = (ImageButton) findViewById(R.id.MStop);
     //mChronometer = (Chronometer) findViewById(R.id.chronometer);
 
 }
@@ -403,7 +425,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void stopRemotePlay(){
-        //Log.e("stopRemotePlay","Start");
+        vProgressBar.setProgress(0);
         if(status==ON||status==PAUSE){
             General.COUNT_TO_CHECK=0;
             sendStatus=STOP;
@@ -423,10 +445,8 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         }
-        //Log.e("stopRemotePlay","WHILE");
         while(General.COLUN_STATUS==General.PLAYING){}//needs resend if packet is lost
         status=ON;
-       // Log.e("stopRemotePlay","END");
     }
 
     public void startRemotePause(){
@@ -473,4 +493,17 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        switch (requestCode){
+            case 1:
+                Log.e("qweqwe","1111");
+                musicUnits.clear();
+                musicUnits = General.getMusicList(General.folderUnits);
+                adapter = new ListMusicAdapter(this, musicUnits);
+                listmusic.setAdapter(adapter);
+                break;
+        }
+    }
 }
